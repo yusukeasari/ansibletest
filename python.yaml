@@ -1,0 +1,81 @@
+- hosts: 192.168.1.166
+  remote_user: root
+
+  vars:
+    pituser_passwd: $1$tekitoun$I9Q2A8pOz5Pc3pEc7PCpa.
+    tmp: /tmp
+    python_version: 2.7.8
+
+  tasks:
+   - name: user adding "pituser"
+     user: name=pituser password={{pituser_passwd}} shell=/bin/bash state=present append=yes groups=sudo
+
+   - name: changing login.defs
+     lineinfile: "/etc/login.defs state=present regexp='^SU_WHEEL_ONLY' line='SU_WHEEL_ONLY yes' backup=yes"
+
+   - name: changing /etc/pam.d/su
+     lineinfile: "/etc/pam.d/su state=present regexp='^pam_wheel.so use_uid' line='auth required pam_wheel.so use_uid' backup=yes"
+
+   - name: changing visudo
+     lineinfile: "/etc/sudoers state=present regexp='^pituser' line='pituser ALL=NOPASSWD:ALL"
+
+   - name: creating log file
+     command: touch /var/log/sudo
+     command: chmod 600 /var/log/sudo
+     lineinfile: "/etc/sudoers state=present regexp='syslog=local1' line='Defaults syslog=local1"
+
+
+   - name: yum -y update
+     yum: name=* state=latest
+
+   - name: yum groupinstall
+     yum: name="{{ item }}" state=present
+     with_items:
+       - "@development tools"
+
+   - name: be sure common packages are installed
+     yum: name={{ item }} state=installed
+     with_items:
+       - zlib
+       - zlib-devel
+       - tk-devel
+       - tcl-devel
+       - sqlite-devel
+       - ncurses-devel
+       - gdbm-devel
+       - readline-devel
+       - bzip2-devel
+       - db4-devel
+       - openssl-devel
+       - xz-libs
+       - wget
+       - libjpeg
+       - libjpeg-devel
+       - libtiff
+       - libtiff-devel
+       - freetype
+       - freetype-devel
+       - littleCMS
+
+   - get_url: url=http://www.python.org/ftp/python/{{python_version}}/Python-{{python_version}}.tar.xz dest={{ tmp }}
+   - command: xz -d Python-{{ python_version }}.tar.xz chdir={{ tmp }}
+   - command: tar xvf Python-{{ python_version }}.tar chdir={{ tmp }}
+   - command: >
+       ./configure
+       chdir={{ tmp }}/Python-{{ python_version }}
+   - command: make chdir={{ tmp }}/Python-{{ python_version }}
+   - command: make altinstall chdir={{ tmp }}/Python-{{ python_version }}
+   - command: mv /usr/bin/python /usr/bin/python.old
+   - command: ln -s /usr/local/bin/python2.7 /usr/bin/python
+
+   - name: installing setuptools
+     get_url: url=https://pypi.python.org/packages/source/s/setuptools/setuptools-1.4.2.tar.gz dest={{ tmp }}
+     command: tar xvf setuptools-1.4.2.tar.gz chdir={{ tmp }}
+     command: python setuptools-1.4.2/setup.py install chdir={{ tmp }}
+   - name: installing pip
+     command: curl https://raw.githubusercontent.com/pypa/pip/master/contrib/get-pip.py | python -
+   - name: installing virtualenv
+     command: pip2.7 install virtualenv
+   - name: installing pillow
+     command: pip2.7 install Pillow
+
